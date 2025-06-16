@@ -1,0 +1,127 @@
+openapi: 3.0.3
+info:
+  title: Trusted Ad Beacon API
+  description: REST API zur Erfassung, Verifikation und Analyse digitaler Werbeimpressionen
+  version: 1.0.0
+servers:
+  - url: https://api.trustedbeacon.io/v1
+paths:
+  /impression:
+    post:
+      summary: Neue Ad-Impression registrieren
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Impression'
+      responses:
+        '200':
+          description: Impression angenommen
+        '400':
+          description: Ungültiger Payload
+  /impressions:
+    get:
+      summary: Liste aller validierten Impressionen abrufen
+      parameters:
+        - name: campaignId
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Liste der Impressionen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ImpressionResponse'
+  /audit/{hash}:
+    get:
+      summary: Prüfe Blockchain-Status einer Impression
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Blockchain-Status der Impression
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  txHash:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+components:
+  schemas:
+    Impression:
+      type: object
+      required:
+        - slotId
+        - campaignId
+        - timestamp
+        - hash
+      properties:
+        slotId:
+          type: string
+        campaignId:
+          type: string
+        creativeId:
+          type: string
+        pageUrl:
+          type: string
+        viewportShare:
+          type: number
+          format: float
+        timeInView:
+          type: integer
+        userInteraction:
+          type: boolean
+        userAgent:
+          type: string
+        hash:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    ImpressionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        slotId:
+          type: string
+        campaignId:
+          type: string
+        verified:
+          type: boolean
+        score:
+          type: number
+        audit:
+          type: object
+          properties:
+            chain:
+              type: string
+            txHash:
+              type: string
+            blockTimestamp:
+              type: string

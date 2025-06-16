@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Beacon Test</title>
+</head>
+<body>
+  <div class="ad-slot"
+       style="width:300px; height:250px; background:#ececec; margin:50px auto;
+              display:flex; align-items:center; justify-content:center;">
+    <strong>Hier läuft die Ad</strong>
+  </div>
+
+  <!-- Beacon erst NACH dem Ad-Container laden -->
+   <div class="ad-slot">…</div>
+  <script src="trusted-ad-beacon.js"></script>
+</body>
+</html>
