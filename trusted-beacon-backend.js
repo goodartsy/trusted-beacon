@@ -1,103 +1,118 @@
 // trusted-beacon-backend.js
-// Trusted Ad Beacon - API Prototype (Express.js) with Full Hash Verification and Debug Logging
+// Trusted Ad Beacon API with Impression- & Session-Endpunkte
 
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const crypto = require('crypto');
+const { JsonRpcProvider, Wallet, Contract } = require('ethers');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middlewares
 app.use(cors());
 app.use(bodyParser.json());
 
+// In-memory Storage
 const impressions = [];
+const sessions = [];
 
-// Utility to compute SHA-256 hash synchronously
+// SHA256 Hash-Funktion
 function computeHash(data) {
-  return crypto.createHash('sha256')
+  return crypto
+    .createHash('sha256')
     .update(JSON.stringify(data))
     .digest('hex');
 }
 
-// POST /impression - register a new ad impression
+// Ethers Setup (optional, je nach Credentials)
+const beaconAbi = [
+  "event ImpressionLogged(address indexed reporter, tuple(string slotId, string campaignId, string creativeId, string pageUrl, uint256 viewportShare, uint256 timeInView, bool userInteraction, uint256 clickCount, uint256 hoverDuration, uint256 timestamp, bytes32 hash) data)",
+  "function logImpression(tuple(string slotId, string campaignId, string creativeId, string pageUrl, uint256 viewportShare, uint256 timeInView, bool userInteraction, uint256 clickCount, uint256 hoverDuration, uint256 timestamp, bytes32 hash)) external",
+  "event SessionLogged(address indexed reporter, tuple(string slotId, string campaignId, string creativeId, string pageUrl, uint256 sessionDuration, uint256 totalClicks, uint256 totalHoverTime, uint256 timestamp) data)",
+  "function logSession(tuple(string slotId, string campaignId, string creativeId, string pageUrl, uint256 sessionDuration, uint256 totalClicks, uint256 totalHoverTime, uint256 timestamp)) external"
+];
+let beaconContract = null;
+if (process.env.PRIVATE_KEY && process.env.RPC_URL && process.env.CONTRACT_ADDRESS && !process.env.PRIVATE_KEY.startsWith('0x0000')) {
+  try {
+    const provider = new JsonRpcProvider(process.env.RPC_URL);
+    const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
+    beaconContract = new Contract(process.env.CONTRACT_ADDRESS, beaconAbi, wallet);
+    console.log('🔗 On-chain logging initialized');
+  } catch (err) {
+    console.warn('⚠️ On-chain setup skipped:', err.message);
+  }
+} else {
+  console.log('⚙️ On-chain logging disabled (no valid credentials)');
+}
+
+// POST /impression
 app.post('/impression', (req, res) => {
-  // 1) Log the entire payload received
-  console.log('\n📥 Impression payload:', req.body);
-
-  const {
-    slotId,
-    campaignId,
-    creativeId,
-    pageUrl,
-    viewportShare,
-    timeInView,
-    userInteraction,
-    clickCount,
-    hoverDuration,
-    userAgent,
-    timestamp,
-    hash: receivedHash
-  } = req.body;
-
-  // 2) Build the exact object to hash, including interaction metrics
-  const payloadToHash = {
-    slotId,
-    campaignId,
-    creativeId,
-    pageUrl,
-    viewportShare,
-    timeInView,
-    userInteraction,
-    clickCount,
-    hoverDuration,
-    userAgent,
-    timestamp
-  };
-
-  // 3) Compute expected hash
-  const expectedHash = computeHash(payloadToHash);
-  console.log('🔑 Received hash:', receivedHash);
-  console.log('🔒 Expected hash:', expectedHash);
-
-  // 4) Validate hash match
-  if (expectedHash !== receivedHash) {
-    console.warn('⚠️ Hash mismatch – rejecting request');
+  const payload = req.body;
+  // Hash verifizieren
+  const toHash = { ...payload };
+  delete toHash.hash;
+  const expected = computeHash(toHash);
+  if (expected !== payload.hash) {
     return res.status(400).json({ error: 'Hash mismatch' });
   }
-
-  // 5) Store the verified impression
-  impressions.push({ ...payloadToHash, hash: receivedHash, verified: true });
-
-  // Respond OK
-  res.status(200).json({ status: 'ok', hash: receivedHash });
+  impressions.push({ ...toHash, hash: payload.hash, verified: true });
+  res.json({ status: 'ok', hash: payload.hash });
+  // Optional on-chain
+  if (beaconContract) {
+    beaconContract.logImpression({
+      slotId: payload.slotId,
+      campaignId: payload.campaignId,
+      creativeId: payload.creativeId || '',
+      pageUrl: payload.pageUrl,
+      viewportShare: payload.viewportShare,
+      timeInView: payload.timeInView,
+      userInteraction: payload.userInteraction,
+      clickCount: payload.clickCount,
+      hoverDuration: payload.hoverDuration,
+      timestamp: Math.floor(new Date(payload.timestamp).getTime()),
+      hash: '0x' + payload.hash
+    }).catch(err => console.error('On-chain error Impression', err));
+  }
 });
 
-// GET /impressions - retrieve all or filter by campaignId
+// GET /impressions
 app.get('/impressions', (req, res) => {
-  const { campaignId } = req.query;
-  const result = campaignId
-    ? impressions.filter(i => i.campaignId === campaignId)
-    : impressions;
-  res.json(result);
+  res.json(impressions);
 });
 
-// GET /audit/:hash - audit an impression by its hash
+// POST /session
+app.post('/session', (req, res) => {
+  const payload = req.body;
+  sessions.push(payload);
+  res.json({ status: 'ok' });
+  if (beaconContract) {
+    beaconContract.logSession({
+      slotId: payload.slotId,
+      campaignId: payload.campaignId,
+      creativeId: payload.creativeId || '',
+      pageUrl: payload.pageUrl,
+      sessionDuration: payload.sessionDuration,
+      totalClicks: payload.totalClicks,
+      totalHoverTime: payload.totalHoverTime,
+      timestamp: Math.floor(new Date(payload.timestamp).getTime())
+    }).catch(err => console.error('On-chain error Session', err));
+  }
+});
+
+// GET /session
+app.get('/session', (req, res) => {
+  res.json(sessions);
+});
+
+// Audit-Endpoint
 app.get('/audit/:hash', (req, res) => {
   const found = impressions.find(i => i.hash === req.params.hash);
-  if (!found) {
-    return res.status(404).json({ valid: false });
-  }
-  res.json({
-    valid: true,
-    txHash: '0xMOCK_TRANSACTION_HASH',
-    timestamp: found.timestamp
-  });
+  res.json(found ? { valid: true, txHash: '0xMOCK_TX' } : { valid: false });
 });
 
-// Start server
+// Server starten
 app.listen(port, () => {
   console.log(`Trusted Beacon Backend running at http://localhost:${port}`);
 });

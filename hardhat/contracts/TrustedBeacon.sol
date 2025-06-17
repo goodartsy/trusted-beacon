@@ -2,47 +2,29 @@
 pragma solidity ^0.8.19;
 
 contract TrustedBeacon {
+    // Struct to bundle impression data
+    struct Impression {
+        string slotId;
+        string campaignId;
+        string creativeId;
+        string pageUrl;
+        uint256 viewportShare;
+        uint256 timeInView;
+        bool userInteraction;
+        uint256 clickCount;
+        uint256 hoverDuration;
+        uint256 timestamp;
+        bytes32 hash;
+    }
+
+    // Event emitting the structured impression data
     event ImpressionLogged(
         address indexed reporter,
-        string slotId,
-        string campaignId,
-        string creativeId,
-        string pageUrl,
-        uint256 viewportShare,
-        uint256 timeInView,
-        bool userInteraction,
-        uint256 clickCount,
-        uint256 hoverDuration,
-        uint256 timestamp,
-        bytes32 hash
+        Impression data
     );
 
-    function logImpression(
-        string calldata slotId,
-        string calldata campaignId,
-        string calldata creativeId,
-        string calldata pageUrl,
-        uint256 viewportShare,
-        uint256 timeInView,
-        bool userInteraction,
-        uint256 clickCount,
-        uint256 hoverDuration,
-        uint256 timestamp,
-        bytes32 hash
-    ) external {
-        emit ImpressionLogged(
-            msg.sender,
-            slotId,
-            campaignId,
-            creativeId,
-            pageUrl,
-            viewportShare,
-            timeInView,
-            userInteraction,
-            clickCount,
-            hoverDuration,
-            timestamp,
-            hash
-        );
+    // Log an impression by passing the Impression struct
+    function logImpression(Impression calldata data) external {
+        emit ImpressionLogged(msg.sender, data);
     }
 }

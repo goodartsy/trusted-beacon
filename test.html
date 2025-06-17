@@ -3,16 +3,34 @@
 <head>
   <meta charset="utf-8"/>
   <title>Beacon Test</title>
+  <style>
+    .ad-slot {
+      width: 300px;
+      height: 250px;
+      background: #ececec;
+      margin: 50px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
-  <div class="ad-slot"
-       style="width:300px; height:250px; background:#ececec; margin:50px auto;
-              display:flex; align-items:center; justify-content:center;">
-    <strong>Hier läuft die Ad</strong>
+  <!-- Dein einziger, klickbare Ad-Container -->
+  <div class="ad-slot" id="ad1">
+    <strong>Hier läuft die Ad (klickbar)</strong>
   </div>
 
-  <!-- Beacon erst NACH dem Ad-Container laden -->
-   <div class="ad-slot">…</div>
-  <script src="trusted-ad-beacon.js"></script>
+  <!-- Beacon-Script mit allen data-Attributen -->
+  <script
+    src="trusted-ad-beacon.js"
+    data-slot-id="slot-123"
+    data-campaign-id="cmp-456"
+    data-creative-id="crv-789"
+    data-api-endpoint="http://localhost:3000/impression"
+    data-threshold="0.5"
+    data-min-view-time="2000"
+  ></script>
 </body>
 </html>
